@@ -714,7 +714,7 @@ export default function Home() {
           throw new Error(body.error || "Unable to load sessions.");
         if (active) {
           setEntries((body.data || []).map(sessionToEntry));
-          setCanManage(true);
+          setCanManage(pathname === "/manage");
         }
       })
       .catch((error: Error) => {
@@ -862,13 +862,11 @@ export default function Home() {
             place.
           </p>
         </div>
-        {canManage && (
-          <div className="welcome-actions">
-            <Button className="primary-button" onClick={openAddSession}>
-              <span>+</span> Add session
-            </Button>
-          </div>
-        )}
+        <div className="welcome-actions">
+          <Button className="primary-button" onClick={openAddSession}>
+            <span>+</span> Add session
+          </Button>
+        </div>
       </section>
 
       <section className="summary-grid" aria-label="Weekly overview">
