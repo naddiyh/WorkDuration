@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 type Entry = { id: number; title: string; project: string; day: string; date: string; time: string; duration: number; color: string };
@@ -72,6 +73,7 @@ function monthRange(year: string, month: string) {
 }
 
 export default function Home() {
+  const pathname = usePathname();
   const [entries, setEntries] = useState(initialEntries);
   const [modalOpen, setModalOpen] = useState(false);
   const [task, setTask] = useState("");
@@ -104,6 +106,14 @@ export default function Home() {
   const visibleEntries = activeDate ? periodEntries.filter((entry) => entry.date === activeDate) : periodEntries;
   const activityLabel = activeDate ? new Intl.DateTimeFormat("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${activeDate}T00:00:00Z`)) : rangeLabel;
 
+  function openAddSession() {
+    if (pathname !== "/manage") {
+      window.location.assign("/login?next=%2Fmanage");
+      return;
+    }
+    setModalOpen(true);
+  }
+
   function addEntry(event: React.FormEvent) {
     event.preventDefault();
     if (!task.trim()) return;
@@ -121,7 +131,7 @@ export default function Home() {
       </header>
       <section className="welcome" id="top">
         <div><p className="eyebrow">NADIYAH · {rangeLabel.toUpperCase()}</p><h1>Work duration overview.</h1><p className="subcopy">Track work hours, review progress, and keep every session in one place.</p></div>
-        <div className="welcome-actions"><Button className="primary-button" onClick={() => setModalOpen(true)}><span>+</span> Add session</Button></div>
+        <div className="welcome-actions"><Button className="primary-button" onClick={openAddSession}><span>+</span> Add session</Button></div>
       </section>
 
       <section className="summary-grid" aria-label="Weekly overview">
