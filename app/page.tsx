@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
-type Entry = { id: number; title: string; project: string; day: string; date: string; time: string; duration: number; color: string };
+type Entry = { id: string | number; title: string; project: string; day: string; date: string; time: string; duration: number; color: string };
+type StoredSession = { id: string; title: string; project: string; work_date: string; start_time: string | null; end_time: string | null; duration_minutes: number; color: string };
 
 const initialEntries: Entry[] = [
   { id: 1, title: "Weekly problem", project: "Deep work", day: "Mon", date: "2026-07-27", time: "08:00 - 09:00", duration: 1, color: "blue" }, { id: 2, title: "Continue build curriculum career", project: "Career project", day: "Mon", date: "2026-07-27", time: "10:00 - 13:00", duration: 3, color: "violet" },
@@ -72,9 +73,18 @@ function monthRange(year: string, month: string) {
   return { start: `${year}-${month}-01`, end: `${year}-${month}-${String(lastDay).padStart(2, "0")}` };
 }
 
+function sessionToEntry(session: StoredSession): Entry {
+  const date = session.work_date;
+  const day = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+  const start = session.start_time?.slice(0, 5);
+  const end = session.end_time?.slice(0, 5);
+  return { id: session.id, title: session.title, project: session.project, day, date, time: start && end ? `${start} - ${end}` : "Flexible", duration: session.duration_minutes / 60, color: session.color };
+}
+
 export default function Home() {
   const pathname = usePathname();
   const [entries, setEntries] = useState(initialEntries);
+  const [loadingEntries, setLoadingEntries] = useState(pathname === "/manage");
   const [modalOpen, setModalOpen] = useState(false);
   const [task, setTask] = useState("");
   const [duration, setDuration] = useState("1");
@@ -106,6 +116,21 @@ export default function Home() {
   const visibleEntries = activeDate ? periodEntries.filter((entry) => entry.date === activeDate) : periodEntries;
   const activityLabel = activeDate ? new Intl.DateTimeFormat("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${activeDate}T00:00:00Z`)) : rangeLabel;
 
+  useEffect(() => {
+    if (pathname !== "/manage") return;
+    let active = true;
+    setLoadingEntries(true);
+    fetch("/api/dashboard/sessions")
+      .then(async (response) => {
+        const body = await response.json() as { data?: StoredSession[]; error?: string };
+        if (!response.ok) throw new Error(body.error || "Unable to load sessions.");
+        if (active) setEntries((body.data || []).map(sessionToEntry));
+      })
+      .catch((error: Error) => { if (active) setNotice(error.message); })
+      .finally(() => { if (active) setLoadingEntries(false); });
+    return () => { active = false; };
+  }, [pathname]);
+
   function openAddSession() {
     if (pathname !== "/manage") {
       window.location.assign("/login?next=%2Fmanage");
@@ -114,11 +139,26 @@ export default function Home() {
     setModalOpen(true);
   }
 
-  function addEntry(event: React.FormEvent) {
+  async function addEntry(event: React.FormEvent) {
     event.preventDefault();
     if (!task.trim()) return;
-    const day = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${selectedDate}T00:00:00Z`));
-    setEntries((current) => [...current, { id: Date.now(), title: task.trim(), project: "Personal", day, date: selectedDate, time: "Flexible", duration: Number(duration), color: "blue" }]);
+    const durationMinutes = Math.round(Number(duration) * 60);
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1) {
+      setNotice("Enter a valid duration.");
+      return;
+    }
+    const response = await fetch("/api/dashboard/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: task.trim(), project: "Personal", workDate: selectedDate, durationMinutes, color: "blue", source: "dashboard" })
+    });
+    const body = await response.json() as { data?: StoredSession; error?: string };
+    const savedSession = body.data;
+    if (!response.ok || !savedSession) {
+      setNotice(body.error || "Unable to save session.");
+      return;
+    }
+    setEntries((current) => [...current, sessionToEntry(savedSession)]);
     const weekStart = startOfWeek(selectedDate);
     setTask(""); setDuration("1"); setStartDate(weekStart); setEndDate(dateAfter(weekStart, 6)); setActiveDate(""); setBreakdownPage(0); setModalOpen(false); setNotice("Session added to your week.");
   }
@@ -127,7 +167,7 @@ export default function Home() {
     <main className="shell">
       <header className="topbar">
         <a className="brand" href="#top"><img className="brand-photo" src="/nade-profile.jpg" alt="Nade" /><span>Nade</span></a>
-        <div className="top-actions"><span className="sync-status"><i /> Up to date</span><button className="icon-button" aria-label="Notifications" onClick={() => setNotice("You’re all caught up.")}>⌁</button></div>
+        <div className="top-actions"><span className="sync-status"><i /> {loadingEntries ? "Loading..." : "Up to date"}</span><button className="icon-button" aria-label="Notifications" onClick={() => setNotice("You’re all caught up.")}>⌁</button></div>
       </header>
       <section className="welcome" id="top">
         <div><p className="eyebrow">NADIYAH · {rangeLabel.toUpperCase()}</p><h1>Work duration overview.</h1><p className="subcopy">Track work hours, review progress, and keep every session in one place.</p></div>
