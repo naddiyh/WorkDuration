@@ -83,8 +83,8 @@ function sessionToEntry(session: StoredSession): Entry {
 
 export default function Home() {
   const pathname = usePathname();
-  const [entries, setEntries] = useState(initialEntries);
-  const [loadingEntries, setLoadingEntries] = useState(pathname === "/manage");
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [loadingEntries, setLoadingEntries] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [task, setTask] = useState("");
   const [duration, setDuration] = useState("1");
@@ -117,10 +117,10 @@ export default function Home() {
   const activityLabel = activeDate ? new Intl.DateTimeFormat("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${activeDate}T00:00:00Z`)) : rangeLabel;
 
   useEffect(() => {
-    if (pathname !== "/manage") return;
     let active = true;
     setLoadingEntries(true);
-    fetch("/api/dashboard/sessions")
+    const sessionsUrl = pathname === "/manage" ? "/api/dashboard/sessions" : "/api/public/sessions";
+    fetch(sessionsUrl)
       .then(async (response) => {
         const body = await response.json() as { data?: StoredSession[]; error?: string };
         if (!response.ok) throw new Error(body.error || "Unable to load sessions.");

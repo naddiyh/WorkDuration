@@ -21,7 +21,7 @@ pnpm dev
 
 ## Nadiyah login and boss monitoring
 
-- `/` is a public dashboard preview; `/manage` is the private management page. Nadiyah signs in with her registered email address and password.
+- `/` is a public, read-only work-duration dashboard; `/manage` is the private management page. Nadiyah signs in with her registered email address and password.
 - `/share/<BOSS_SHARE_TOKEN>` is a read-only monitoring page for the boss. Do not share the token publicly.
 - In Supabase Auth, create Nadiyah's account first, then disable new-user signups so only existing accounts can sign in.
 
