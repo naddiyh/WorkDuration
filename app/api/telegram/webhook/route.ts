@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { detectReportIntent, extractWorkSession, generateWorkReport, localToday, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
+import { detectReportIntent, detectSimpleReportIntent, extractWorkSession, generateWorkReport, localToday, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
 import { clearTelegramDraft, getTelegramDraft, saveTelegramDraft, type TelegramWorkDraft } from "@/lib/telegram-draft";
 import { validateWorkSession } from "@/lib/work-session";
 import { fallbackWorkReport, formatProjectList, getRecentProjects, getWorkReport, parseReportPeriod } from "@/lib/work-report";
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const reportIntent = await detectReportIntent(message.text);
+    const reportIntent = detectSimpleReportIntent(message.text) || await detectReportIntent(message.text);
     if (reportIntent) {
       const period = parseReportPeriod(reportIntent.kind, reportIntent.periodArgument, localToday());
       if (period) {

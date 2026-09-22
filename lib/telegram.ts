@@ -75,6 +75,19 @@ export function mayBeReportRequest(message: string) {
   return /\b(recap|report|summary|summarize|summarise|activity|progress|show|share|list|what did i work|how was my work|what have i done)\b/i.test(message);
 }
 
+export function detectSimpleReportIntent(message: string): ReportIntent | null {
+  if (!mayBeReportRequest(message)) return null;
+  const input = message.toLowerCase();
+  if (/\b(yesterday|kemarin)\b/.test(input)) return { kind: "daily", periodArgument: "yesterday" };
+  if (/\b(today|this day|hari ini)\b/.test(input)) return { kind: "daily", periodArgument: "today" };
+  if (/\b(last week|minggu lalu)\b/.test(input)) return { kind: "weekly", periodArgument: "last week" };
+  if (/\b(this week|current week|minggu ini)\b/.test(input)) return { kind: "weekly", periodArgument: "this week" };
+  if (/\b(last month|bulan lalu)\b/.test(input)) return { kind: "monthly", periodArgument: "last month" };
+  if (/\b(this month|current month|bulan ini)\b/.test(input)) return { kind: "monthly", periodArgument: "this month" };
+  const namedMonth = input.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|januari|februari|maret|mei|juni|juli|agustus|september|oktober|november|desember)\s+(\d{4})\b/);
+  return namedMonth ? { kind: "monthly", periodArgument: namedMonth[0] } : null;
+}
+
 export async function detectReportIntent(message: string): Promise<ReportIntent | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || !mayBeReportRequest(message)) return null;
