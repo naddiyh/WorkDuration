@@ -70,3 +70,7 @@ curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
 ```
 
 Then send the bot a message such as: `Worked on curriculum revision today from 10:00 to 12:30.`
+
+The bot can also generate narrative reports from your saved sessions. Send `/daily`, `/weekly`, or `/monthly`; each accepts a flexible period, for example `/daily yesterday`, `/weekly last week`, and `/monthly August 2026`. Supabase provides the calculated facts and Groq turns them into a short English report. If Groq is unavailable, the bot sends a factual fallback instead.
+
+When a work message is incomplete, the bot remembers its details for 30 minutes and asks only for what is missing. The user can reply with the missing information or send `/cancel` to discard the unfinished entry. Run the updated `supabase/schema.sql` once to create `telegram_work_drafts` before deploying this feature.

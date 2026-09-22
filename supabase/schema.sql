@@ -14,6 +14,16 @@ create table if not exists public.work_sessions (
 
 create index if not exists work_sessions_work_date_idx on public.work_sessions (work_date);
 
+-- Temporarily keeps an incomplete Telegram entry while the bot asks for its
+-- missing details. Drafts expire automatically in the application after 30 minutes.
+create table if not exists public.telegram_work_drafts (
+  chat_id bigint primary key,
+  draft jsonb not null default '{}'::jsonb,
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+
 -- The table is accessed only by the server-side service-role client. RLS blocks
 -- direct browser access. Add Supabase Auth policies when multi-user support is added.
 alter table public.work_sessions enable row level security;
+alter table public.telegram_work_drafts enable row level security;

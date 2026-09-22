@@ -13,7 +13,7 @@ export async function sendTelegramMessage(chatId: number, text: string) {
   if (!response.ok) throw new Error("Telegram could not send the reply.");
 }
 
-function localToday() {
+export function localToday() {
   const parts = new Intl.DateTimeFormat("en", { timeZone: process.env.WORK_DURATION_TIMEZONE || "Asia/Makassar", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts();
   const get = (type: string) => parts.find((part) => part.type === type)?.value;
   return `${get("year")}-${get("month")}-${get("day")}`;
@@ -32,7 +32,7 @@ export async function extractWorkSession(message: string) {
       max_completion_tokens: 300,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: `Extract one work-duration entry. Today is ${localToday()} in ${process.env.WORK_DURATION_TIMEZONE || "Asia/Makassar"}. Reply with JSON only: {"title":"string","project":"string","workDate":"YYYY-MM-DD","startTime":"HH:MM or null","endTime":"HH:MM or null","durationMinutes":number,"color":"blue|violet|amber|green"}. Interpret relative dates using today. Use duration from stated time range; if no duration is stated, return durationMinutes: 0.` },
+        { role: "system", content: `Extract any stated details for one work-duration entry. Today is ${localToday()} in ${process.env.WORK_DURATION_TIMEZONE || "Asia/Makassar"}. Reply with JSON only: {"title":"string or null","project":"string or null","workDate":"YYYY-MM-DD or null","startTime":"HH:MM or null","endTime":"HH:MM or null","durationMinutes":"integer or null","color":"blue|violet|amber|green or null"}. Interpret only explicit relative dates such as today or yesterday. Never invent a title, date, duration, or time. Derive duration from an explicitly stated start/end range.` },
         { role: "user", content: message }
       ]
     })
@@ -42,4 +42,26 @@ export async function extractWorkSession(message: string) {
   const content = body.choices?.[0]?.message?.content;
   if (!content) throw new Error("Groq returned an empty response.");
   return JSON.parse(content) as unknown;
+}
+
+export async function generateWorkReport(stats: Record<string, unknown>, fallback: string) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return fallback;
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      temperature: 0.3,
+      max_completion_tokens: 250,
+      messages: [
+        { role: "system", content: "Write a concise, upbeat and friendly work report in casual English, at most two short paragraphs. Start naturally, such as 'Here is your recap 👀' when it fits. Use only the supplied facts. Do not invent numbers, dates, trends, causes, or advice that is not supported by the facts. A light encouraging closing is fine only when supported by the data. Use at most two fitting emojis. Do not use Markdown headings or bullet points." },
+        { role: "user", content: JSON.stringify(stats) }
+      ]
+    })
+  });
+  if (!response.ok) return fallback;
+  const body = await response.json() as { choices?: { message?: { content?: string } }[] };
+  return body.choices?.[0]?.message?.content?.trim() || fallback;
 }
