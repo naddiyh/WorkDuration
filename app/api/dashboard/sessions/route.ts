@@ -65,3 +65,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unable to save session." }, { status: 503 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  if (!await authorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const id = request.nextUrl.searchParams.get("id");
+  const session = validateWorkSession(await request.json().catch(() => null));
+  if (!id || !session) return NextResponse.json({ error: "Invalid session payload." }, { status: 400 });
+  try {
+    const { data, error } = await getSupabaseAdmin().from("work_sessions").update({ title: session.title, project: session.project, work_date: session.workDate, start_time: session.startTime, end_time: session.endTime, duration_minutes: session.durationMinutes, color: session.color }).eq("id", id).select("id, title, project, work_date, start_time, end_time, duration_minutes, color").single();
+    if (error) throw error;
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error("Unable to update dashboard session", error);
+    return NextResponse.json({ error: "Unable to update session." }, { status: 503 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!await authorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const id = request.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Session ID is required." }, { status: 400 });
+  try {
+    const { error } = await getSupabaseAdmin().from("work_sessions").delete().eq("id", id);
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Unable to delete dashboard session", error);
+    return NextResponse.json({ error: "Unable to delete session." }, { status: 503 });
+  }
+}
