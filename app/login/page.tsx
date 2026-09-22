@@ -39,7 +39,7 @@ export default function LoginPage() {
           <span>Nade</span>
         </a>
         <p className="eyebrow">PRIVATE WORKSPACE</p>
-        <h1>Login to manage your work time.</h1>
+        <h1>Login to manage your work time</h1>
         <p>Login your email</p>
         <form onSubmit={signIn}>
           <label>
