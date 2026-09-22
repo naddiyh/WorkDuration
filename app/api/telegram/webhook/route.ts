@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { extractWorkSession, generateWorkReport, localToday, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
+import { detectReportIntent, extractWorkSession, generateWorkReport, localToday, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
 import { clearTelegramDraft, getTelegramDraft, saveTelegramDraft, type TelegramWorkDraft } from "@/lib/telegram-draft";
 import { validateWorkSession } from "@/lib/work-session";
 import { fallbackWorkReport, formatProjectList, getRecentProjects, getWorkReport, parseReportPeriod } from "@/lib/work-report";
@@ -96,6 +96,17 @@ export async function POST(request: NextRequest) {
       const report = await generateWorkReport(stats, fallbackWorkReport(stats));
       await sendTelegramMessage(message.chat.id, report);
       return NextResponse.json({ ok: true });
+    }
+
+    const reportIntent = await detectReportIntent(message.text);
+    if (reportIntent) {
+      const period = parseReportPeriod(reportIntent.kind, reportIntent.periodArgument, localToday());
+      if (period) {
+        const stats = await getWorkReport(getSupabaseAdmin(), period);
+        const report = await generateWorkReport(stats, fallbackWorkReport(stats));
+        await sendTelegramMessage(message.chat.id, report);
+        return NextResponse.json({ ok: true });
+      }
     }
 
     if (/^\/(start|help)(?:@[a-z0-9_]+)?\s*$/i.test(message.text)) {

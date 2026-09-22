@@ -65,3 +65,46 @@ export async function generateWorkReport(stats: Record<string, unknown>, fallbac
   const body = await response.json() as { choices?: { message?: { content?: string } }[] };
   return body.choices?.[0]?.message?.content?.trim() || fallback;
 }
+
+export type ReportIntent = {
+  kind: "daily" | "weekly" | "monthly";
+  periodArgument?: string;
+};
+
+export function mayBeReportRequest(message: string) {
+  return /\b(recap|report|summary|summarize|summarise|activity|progress|show|share|list|what did i work|how was my work|what have i done)\b/i.test(message);
+}
+
+export async function detectReportIntent(message: string): Promise<ReportIntent | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || !mayBeReportRequest(message)) return null;
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      temperature: 0,
+      max_completion_tokens: 80,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "Classify whether the user is asking for a personal work-time report or recap. Reply only with JSON: {\"kind\":\"daily|weekly|monthly|null\",\"periodArgument\":\"string|null\"}. Return null if it is not a request for a report. For daily use arguments such as today or yesterday; for weekly use this week or last week; for monthly use a month and year, this month, or last month. Do not classify a message that logs work as a report request."
+        },
+        { role: "user", content: message }
+      ]
+    })
+  });
+  if (!response.ok) return null;
+  const body = await response.json() as { choices?: { message?: { content?: string } }[] };
+  const content = body.choices?.[0]?.message?.content;
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content) as { kind?: unknown; periodArgument?: unknown };
+    if (parsed.kind !== "daily" && parsed.kind !== "weekly" && parsed.kind !== "monthly") return null;
+    return { kind: parsed.kind, periodArgument: typeof parsed.periodArgument === "string" ? parsed.periodArgument : undefined };
+  } catch {
+    return null;
+  }
+}
