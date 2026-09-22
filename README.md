@@ -21,9 +21,9 @@ pnpm dev
 
 ## Nadiyah login and boss monitoring
 
-- `/` and `/manage` are private management pages. Nadiyah signs in using a Supabase magic link.
+- `/` is a public dashboard preview; `/manage` is the private management page. Nadiyah signs in with her registered email address and password.
 - `/share/<BOSS_SHARE_TOKEN>` is a read-only monitoring page for the boss. Do not share the token publicly.
-- In Supabase Auth, disable new-user signups after creating Nadiyah's account, so only her email can receive a sign-in link.
+- In Supabase Auth, create Nadiyah's account first, then disable new-user signups so only existing accounts can sign in.
 
 Add `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `BOSS_SHARE_TOKEN` to Vercel alongside the existing variables. Configure your production URL in Supabase Auth's redirect URL list, for example: `https://your-domain.com/auth/callback`.
 

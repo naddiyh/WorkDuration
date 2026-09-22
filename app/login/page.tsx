@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function signIn(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
+    setMessage("");
     const requestedNext = new URLSearchParams(window.location.search).get(
       "next",
     );
@@ -19,16 +21,16 @@ export default function LoginPage() {
       requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
         ? requestedNext
         : "/manage";
-    const { error } = await createSupabaseBrowserClient().auth.signInWithOtp({
+    const { error } = await createSupabaseBrowserClient().auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
+      password,
     });
     setLoading(false);
-    setMessage(
-      error ? error.message : "Check your email for a secure login link.",
-    );
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    window.location.assign(next);
   }
 
   return (
@@ -40,7 +42,7 @@ export default function LoginPage() {
         </a>
         <p className="eyebrow">PRIVATE WORKSPACE</p>
         <h1>Login to manage your work time</h1>
-        <p>Login your email</p>
+        <p>Use the email address and password registered for this workspace.</p>
         <form onSubmit={signIn}>
           <label>
             Email address
@@ -52,8 +54,18 @@ export default function LoginPage() {
               placeholder="nadiyah@company.com"
             />
           </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </label>
           <Button className="primary-button" disabled={loading}>
-            {loading ? "Loading..." : "Login"}
+            {loading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
         {message && <p className="auth-message">{message}</p>}
