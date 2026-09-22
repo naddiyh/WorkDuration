@@ -23,6 +23,12 @@ export type WorkReportStats = {
   previousTotalMinutes: number | null;
 };
 
+export type RecentProject = {
+  name: string;
+  totalMinutes: number;
+  lastWorkDate: string;
+};
+
 const MONTHS: Record<string, number> = {
   januari: 0, jan: 0, january: 0,
   februari: 1, feb: 1, february: 1,
@@ -164,6 +170,35 @@ export async function getWorkReport(supabase: { from: (table: string) => any }, 
 
 export function formatMinutes(minutes: number) {
   return `${Math.floor(minutes / 60)} hour${Math.floor(minutes / 60) === 1 ? "" : "s"}${minutes % 60 ? ` ${minutes % 60} minute${minutes % 60 === 1 ? "" : "s"}` : ""}`;
+}
+
+export async function getRecentProjects(supabase: { from: (table: string) => any }): Promise<RecentProject[]> {
+  const { data, error } = await supabase
+    .from("work_sessions")
+    .select("project, work_date, duration_minutes");
+  if (error) throw error;
+
+  const projects = new Map<string, RecentProject>();
+  for (const session of (data || []) as Pick<SessionRow, "project" | "work_date" | "duration_minutes">[]) {
+    const name = session.project.trim() || "Personal";
+    const current = projects.get(name);
+    projects.set(name, {
+      name,
+      totalMinutes: (current?.totalMinutes || 0) + session.duration_minutes,
+      lastWorkDate: !current || session.work_date > current.lastWorkDate ? session.work_date : current.lastWorkDate,
+    });
+  }
+  return [...projects.values()].sort((left, right) =>
+    right.lastWorkDate.localeCompare(left.lastWorkDate) || right.totalMinutes - left.totalMinutes || left.name.localeCompare(right.name)
+  );
+}
+
+export function formatProjectList(projects: RecentProject[]) {
+  if (!projects.length) return "No projects have been logged yet — your next session can be the first one. ✨";
+  const lines = projects.map((project, index) =>
+    `${index + 1}. ${project.name} — ${formatMinutes(project.totalMinutes)} logged · last active ${formatLongDate(project.lastWorkDate)}`
+  );
+  return `Your recent projects 👀\n\n${lines.join("\n")}\n\nTotal: ${projects.length} project${projects.length === 1 ? "" : "s"}`;
 }
 
 export function fallbackWorkReport(stats: WorkReportStats) {

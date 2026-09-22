@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { extractWorkSession, generateWorkReport, localToday, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
 import { clearTelegramDraft, getTelegramDraft, saveTelegramDraft, type TelegramWorkDraft } from "@/lib/telegram-draft";
 import { validateWorkSession } from "@/lib/work-session";
-import { fallbackWorkReport, getWorkReport, parseReportPeriod } from "@/lib/work-report";
+import { fallbackWorkReport, formatProjectList, getRecentProjects, getWorkReport, parseReportPeriod } from "@/lib/work-report";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -14,6 +14,20 @@ function allowedChat(chatId: number) {
 }
 
 const REPORT_COMMAND = /^\/(daily|weekly|monthly)(?:@[a-z0-9_]+)?(?:\s+(.+))?$/i;
+const GREETING = /^(hi|hello|hey|halo|hai)[!.,\s]*$/i;
+const WELCOME_MESSAGE = [
+  "Hey! \u{1F44B} I’m Nadiyah’s Assistant — here to help you keep track of your work time.",
+  "",
+  "Send me a work log in plain English, for example:",
+  "Worked on the landing page today for 2 hours.",
+  "",
+  "Here’s what I can do:",
+  "/daily — today’s recap",
+  "/weekly — this week’s recap",
+  "/monthly August 2026 — a monthly recap",
+  "/projects — your recent projects",
+  "/cancel — discard an unfinished entry"
+].join("\n");
 
 function mergeDraft(draft: TelegramWorkDraft, extracted: Record<string, unknown>): TelegramWorkDraft {
   const next: TelegramWorkDraft = { ...draft };
@@ -47,6 +61,11 @@ export async function POST(request: NextRequest) {
   if (!allowedChat(message.chat.id)) return NextResponse.json({ ok: true });
 
   try {
+    if (/^\/(start|help)(?:@[a-z0-9_]+)?\s*$/i.test(message.text) || GREETING.test(message.text.trim())) {
+      await sendTelegramMessage(message.chat.id, WELCOME_MESSAGE);
+      return NextResponse.json({ ok: true });
+    }
+
     if (/^\/cancel(?:@[a-z0-9_]+)?\s*$/i.test(message.text)) {
       await clearTelegramDraft(message.chat.id);
       await sendTelegramMessage(message.chat.id, "All good — I cleared that unfinished entry.");
@@ -55,6 +74,12 @@ export async function POST(request: NextRequest) {
 
     if (/^\/(start|help)(?:@[a-z0-9_]+)?\s*$/i.test(message.text)) {
       await sendTelegramMessage(message.chat.id, "Hey! Send me a work log like: Worked on curriculum revision today from 10:00 to 12:30. I can also make reports with /daily, /weekly, or /monthly — try /monthly August 2026. ✨");
+      return NextResponse.json({ ok: true });
+    }
+
+    if (/^\/projects(?:@[a-z0-9_]+)?\s*$/i.test(message.text)) {
+      const projects = await getRecentProjects(getSupabaseAdmin());
+      await sendTelegramMessage(message.chat.id, formatProjectList(projects));
       return NextResponse.json({ ok: true });
     }
 
