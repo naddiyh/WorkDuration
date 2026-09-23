@@ -63,7 +63,10 @@ export async function generateWorkReport(stats: Record<string, unknown>, fallbac
   });
   if (!response.ok) return fallback;
   const body = await response.json() as { choices?: { message?: { content?: string } }[] };
-  return body.choices?.[0]?.message?.content?.trim() || fallback;
+  const report = body.choices?.[0]?.message?.content?.trim();
+  // A partial model completion is worse than the factual fallback. A report
+  // always contains at least one number (duration or session count).
+  return report && report.length >= 80 && /\d/.test(report) ? report : fallback;
 }
 
 export type ReportIntent = {

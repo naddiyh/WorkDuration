@@ -14,6 +14,15 @@ type Entry = {
   duration: number;
   color: string;
 };
+type EntryGroup = {
+  id: string;
+  title: string;
+  project: string;
+  date: string;
+  color: string;
+  entries: Entry[];
+  totalDuration: number;
+};
 type StoredSession = {
   id: string;
   title: string;
@@ -669,6 +678,10 @@ export default function Home() {
       ),
     [entries, startDate, endDate],
   );
+  const maxDisplayDayHours = useMemo(
+    () => Math.max(...displayDays.map((item) => hoursFor(periodEntries, item.date)), 1),
+    [displayDays, periodEntries],
+  );
   const total = useMemo(
     () => periodEntries.reduce((sum, entry) => sum + entry.duration, 0),
     [periodEntries],
@@ -686,6 +699,31 @@ export default function Home() {
   const visibleEntries = activeDate
     ? periodEntries.filter((entry) => entry.date === activeDate)
     : periodEntries;
+  const groupedVisibleEntries = useMemo(() => {
+    const groups = new Map<string, EntryGroup>();
+    for (const entry of visibleEntries) {
+      const id = `${entry.title}\u0000${entry.project}\u0000${entry.date}`;
+      const group = groups.get(id);
+      if (group) {
+        group.entries.push(entry);
+        group.totalDuration += entry.duration;
+      } else {
+        groups.set(id, {
+          id,
+          title: entry.title,
+          project: entry.project,
+          date: entry.date,
+          color: entry.color,
+          entries: [entry],
+          totalDuration: entry.duration,
+        });
+      }
+    }
+    return [...groups.values()].map((group) => ({
+      ...group,
+      entries: [...group.entries].sort((left, right) => left.time.localeCompare(right.time)),
+    }));
+  }, [visibleEntries]);
   const activityLabel = activeDate
     ? new Intl.DateTimeFormat("en-US", {
         weekday: "long",
@@ -1070,7 +1108,7 @@ export default function Home() {
                   <span
                     className="bar"
                     style={{
-                      height: `${Math.max(hour * 13, hour ? 16 : 3)}px`,
+                      height: `${hour ? Math.max(Math.round((hour / maxDisplayDayHours) * 55), 16) : 3}px`,
                     }}
                   />
                 </span>
@@ -1104,7 +1142,7 @@ export default function Home() {
                   <span
                     className="bar"
                     style={{
-                      height: `${Math.max(hour * 13, hour ? 16 : 3)}px`,
+                      height: `${hour ? Math.max(Math.round((hour / maxDisplayDayHours) * 55), 16) : 3}px`,
                     }}
                   />
                 </span>
@@ -1134,6 +1172,38 @@ export default function Home() {
           )}
         </div>
         <div className="schedule-card">
+          {groupedVisibleEntries.map((group) => (
+            <article className="session-group" key={group.id}>
+              <header className="session-group-header">
+                <span className={`session-dot ${group.color}`} />
+                <div className="session-main">
+                  <h3>{group.title}</h3>
+                  <p>{group.project}</p>
+                  <p className="session-date">{formatDate(group.date)}</p>
+                </div>
+                <div className="session-duration">{group.totalDuration}h total</div>
+              </header>
+              <div className="session-group-entries">
+                {group.entries.map((entry) => (
+                  <div className="session-row" key={entry.id}>
+                    <span className="session-time">{formatClock(entry.time)}</span>
+                    <span className="session-duration">{entry.duration}h</span>
+                    {canManage && (
+                      <div className="session-actions">
+                        <Button variant="ghost" size="sm" className="icon-action" aria-label={`Edit ${entry.title}`} title="Edit session" onClick={() => openEditor(entry)}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg>
+                        </Button>
+                        <Button variant="ghost" size="sm" className="icon-action delete-button" aria-label={`Delete ${entry.title}`} title="Delete session" onClick={() => deleteEntry(entry)}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-3h4l1 3m-9 0 1 13h10l1-13" /></svg>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+          <div className="legacy-session-list" aria-hidden="true">
           {visibleEntries.map((entry) => (
             <article className="session" key={entry.id}>
               <span className={`session-dot ${entry.color}`} />
@@ -1176,6 +1246,7 @@ export default function Home() {
               )}
             </article>
           ))}
+          </div>
           {visibleEntries.length === 0 && (
             <p className="empty">Nothing is planned for this day yet.</p>
           )}
